@@ -96,6 +96,48 @@ RULES = [
 CAT_LABEL = {"L": "Veehouderij (gras/voer)", "H": "Menselijke voeding",
              "M": "Gemengd / dual-use", "O": "Overig agrarisch"}
 
+# Nitrogen-zone width (m) per Natura 2000 area, from the cabinet policy annex
+# "Verdiepingsbijlage Hoofdlijn 3: Inzet in en rond kwetsbare natuur- en
+# watergebieden" (2025), Bijlage 1. Nationally: 500 m around ~85 areas,
+# 1000 m around 15 where nitrogen from the zone is especially damaging, and
+# no zone for large waters / non-nitrogen-sensitive areas. This table covers
+# every N2000 area within reach of Overijssel; DEFAULT_WIDTH catches any not
+# listed (logged at build time so the table can be extended).
+DEFAULT_WIDTH = 500
+ZONE_WIDTH = {
+    # 1000 m
+    "Springendal & Dal van de Mosbeek": 1000,
+    "Vecht- en Beneden-Reggegebied": 1000,
+    "Drents-Friese Wold & Leggelderveld": 1000,   # bordering (Drenthe)
+    # 500 m — Overijssel
+    "Aamsveen": 500,
+    "Achter de Voort, Agelerbroek & Voltherbroek": 500,
+    "Bergvennen & Brecklenkampse Veld": 500,
+    "Boetelerveld": 500,
+    "Borkeld": 500,
+    "Buurserzand & Haaksbergerveen": 500,
+    "De Wieden": 500,
+    "Dinkelland": 500,
+    "Engbertsdijksvenen": 500,
+    "Landgoederen Oldenzaal": 500,
+    "Lemselermaten": 500,
+    "Lonnekermeer": 500,
+    "Olde Maten & Veerslootslanden": 500,
+    "Sallandse Heuvelrug": 500,
+    "Uiterwaarden Zwarte Water en Vecht": 500,
+    "Weerribben": 500,
+    "Wierdense Veld": 500,
+    "Witte Veen": 500,
+    # 500 m — bordering, reaching into Overijssel
+    "Holtingerveld": 500,
+    "Rottige Meenthe & Brandemeer": 500,
+    "Rijntakken": 500,
+    # 0 = no zoning (large waters / non-nitrogen-sensitive, excluded)
+    "Ketelmeer & Vossemeer": 0,
+    "Veluwerandmeren": 0,
+    "Zwarte Meer": 0,
+}
+
 session = requests.Session()
 session.headers["User-Agent"] = "overijssel-landuse-map (hobby project)"
 
@@ -341,31 +383,48 @@ def main():
             log(f"  {area:9.1f} ha  {name}")
         log("")
 
-    # Natura 2000 near the province + 1 km buffer zone
+    # Natura 2000 near the province (BUFFER_M = widest possible zone = margin)
     near = natura.iloc[natura.sindex.query(
         prov_geom.buffer(BUFFER_M), predicate="intersects")].copy()
-    log(f"Natura 2000 areas within 1 km of Overijssel: {len(near)} "
-        f"({sorted(near['naamN2K'].unique())})")
-    n2k_union = shapely.make_valid(near.geometry.union_all())
-    zone_full = n2k_union.buffer(BUFFER_M)          # N2000 + 1 km
-    ring = zone_full.difference(n2k_union)          # the 1 km band itself
-    ring_clip = ring.intersection(prov_geom)
+    near["w"] = near["naamN2K"].map(ZONE_WIDTH)
+    unknown = sorted(near.loc[near["w"].isna(), "naamN2K"].unique())
+    if unknown:
+        log(f"N2000 areas not in ZONE_WIDTH -> {DEFAULT_WIDTH} m: {unknown}")
+    near["w"] = near["w"].fillna(DEFAULT_WIDTH).astype(int)
+    log(f"Natura 2000 areas near Overijssel: {len(near)}; zone widths "
+        f"{near.groupby('naamN2K')['w'].first().value_counts().to_dict()}")
 
-    # flag parcels within 1 km of (or inside) Natura 2000
-    hit = parcels.sindex.query(zone_full, predicate="intersects")
+    # per-area nitrogen zone: buffer each area by its own policy width, then
+    # dissolve per width. n2k_zoned = only areas that actually get a zone.
+    n2k_zoned = shapely.make_valid(
+        near.loc[near["w"] > 0].geometry.union_all())
+    band = {}  # width -> buffered union of that width's areas (incl. interior)
+    for w in sorted(near.loc[near["w"] > 0, "w"].unique()):
+        areas = shapely.make_valid(near.loc[near["w"] == w].geometry.union_all())
+        band[int(w)] = areas.buffer(int(w))
+
+    zone_full = shapely.union_all(list(band.values()))
+
+    # flag parcels by the widest zone they fall in (1000 > 500 > 0)
     parcels["z"] = 0
-    parcels.iloc[sorted(hit), parcels.columns.get_loc("z")] = 1
-    log(f"Parcels in nitrogen zone: {int(parcels['z'].sum())} of {len(parcels)}")
+    for w in sorted(band, reverse=True):
+        idx = parcels.iloc[sorted(parcels.sindex.query(
+            band[w], predicate="intersects"))].index
+        parcels.loc[(parcels["z"] == 0) & parcels.index.isin(idx), "z"] = w
+    for w in sorted(band, reverse=True):
+        log(f"Parcels in {w} m zone: {int((parcels['z'] == w).sum())}")
+    log(f"Parcels outside any zone: {int((parcels['z'] == 0).sum())}")
 
-    # stats (ha per category, total vs in-zone)
+    # stats (ha per category: total, and in the nitrogen zone = any width > 0)
     stats = {}
     for cat in "LHMO":
         sub = parcels[parcels["cat"] == cat]
+        in_zone = sub["z"] > 0
         stats[cat] = {"label": CAT_LABEL[cat],
                       "ha": round(float(sub["ha"].sum())),
-                      "ha_zone": round(float(sub.loc[sub["z"] == 1, "ha"].sum())),
+                      "ha_zone": round(float(sub.loc[in_zone, "ha"].sum())),
                       "n": int(len(sub)),
-                      "n_zone": int(sub["z"].sum())}
+                      "n_zone": int(in_zone.sum())}
 
     # ---------- export ----------
     log("Simplifying and exporting...")
@@ -379,9 +438,21 @@ def main():
     natura_w = near.to_crs(WGS)
     natura_fc = to_fc(natura_w, {"naam": "naamN2K", "bescherming": "beschermin"})
 
-    zone_gdf = gpd.GeoDataFrame({"id": [1]}, geometry=[
-        shapely.simplify(ring_clip, SIMPLIFY_AREA_M)], crs=RD).to_crs(WGS)
-    zone_fc = to_fc(zone_gdf, {"id": "id"})
+    # zone bands as rings (buffer minus zoned N2000), one feature per width,
+    # made non-overlapping so a wider band never draws under a narrower one
+    rings, widths, covered = [], [], None
+    for w in sorted(band, reverse=True):          # 1000 first, then 500
+        ring = band[w].difference(n2k_zoned)
+        if covered is not None:
+            ring = ring.difference(covered)
+        ring = ring.intersection(prov_geom)
+        covered = band[w] if covered is None else shapely.union_all(
+            [covered, band[w]])
+        rings.append(shapely.simplify(ring, SIMPLIFY_AREA_M))
+        widths.append(w)
+    zone_gdf = gpd.GeoDataFrame({"w": widths}, geometry=rings,
+                                crs=RD).to_crs(WGS)
+    zone_fc = to_fc(zone_gdf, {"w": "w"})
 
     nnn_geom = get_nnn(prov_geom)
     nnn_gdf = gpd.GeoDataFrame({"id": [1]}, geometry=[
@@ -394,9 +465,12 @@ def main():
     prov_fc = to_fc(prov_gdf, {"naam": "naam"})
 
     crop_names = {int(r.gewascode): r.gewas for r in crops.itertuples()}
+    widths_used = sorted(int(w) for w in near.loc[near["w"] > 0, "w"].unique())
+    areas_1000 = sorted(near.loc[near["w"] == 1000, "naamN2K"].unique())
     meta = {"year": year,
             "built": time.strftime("%Y-%m-%d"),
-            "buffer_m": BUFFER_M,
+            "widths": widths_used,
+            "areas_1000": areas_1000,
             "stats": stats,
             "crops": crop_names}
     write_js(DATA / "province.js", PROVINCE=prov_fc, META=meta)
@@ -404,7 +478,8 @@ def main():
     log("\nDone. Open index.html in your browser.")
     for cat in "LHMO":
         s = stats[cat]
-        log(f"  {s['label']:<26} {s['ha']:>8} ha total, {s['ha_zone']:>7} ha in 1 km zone")
+        log(f"  {s['label']:<26} {s['ha']:>8} ha total, "
+            f"{s['ha_zone']:>7} ha in nitrogen zone")
 
 
 if __name__ == "__main__":

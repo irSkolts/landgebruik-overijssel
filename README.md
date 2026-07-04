@@ -11,9 +11,14 @@ Interactieve kaart van de provincie Overijssel met:
 - **Natura 2000-gebieden** (RVO)
 - **Natuurnetwerk Nederland (NNN)** (provincies, via PDOK) — lichte groene
   waas onder de Natura 2000-gebieden (63.205 ha in Overijssel)
-- De **zone binnen 1 km** van Natura 2000, waar volgens de aangekondigde
-  plannen de strengste stikstofrestricties gaan gelden. Percelen in die zone
-  worden gearceerd weergegeven.
+- De **stikstofzone** rond Natura 2000, waar strengere stikstofrestricties
+  gaan gelden. De breedte volgt het kabinetsvoornemen (Verdiepingsbijlage
+  Hoofdlijn 3, 2025, Bijlage 1): **500 m** rond de meeste stikstofgevoelige
+  gebieden en **1 km** rond enkele. In Overijssel krijgen alleen *Springendal
+  & Dal van de Mosbeek* en *Vecht- en Beneden-Reggegebied* een zone van 1 km;
+  grote wateren (Zwarte Meer, Ketelmeer & Vossemeer, Veluwerandmeren) krijgen
+  geen zone. Percelen in een zone worden gearceerd weergegeven (500 m oranje,
+  1 km rood).
 
 ## Gebruik
 
@@ -24,7 +29,7 @@ perceeldata staat lokaal in `data/`.
 - Vink lagen aan/uit in het paneel linksboven.
 - Klik op een perceel voor gewas, oppervlakte en zonestatus.
 - De tabel onderin het paneel toont hectares per categorie, totaal en
-  binnen de 1 km-zone.
+  binnen de stikstofzone.
 
 ## Data verversen
 
@@ -61,9 +66,12 @@ perceellocatie.
 
 ## Kanttekeningen
 
-- De 1 km-zone is een **geometrische benadering** (buffer van 1000 m rond de
-  officiële Natura 2000-begrenzing, incl. gebieden net buiten de provincie).
-  De uiteindelijke juridische begrenzing van stikstofzones kan afwijken.
+- De stikstofzones zijn een **geometrische benadering**: een buffer van 500 m
+  of 1 km rond de officiële Natura 2000-begrenzing (incl. gebieden net buiten
+  de provincie), volgens de zonebreedtes uit het kabinetsvoornemen. Dat
+  voornemen is voorlopig — de lijst gebieden en de definitieve juridische
+  begrenzing kunnen nog wijzigen. De zonebreedte per gebied staat in de tabel
+  `ZONE_WIDTH` bovenin `build_data.py` en is daar aan te passen.
 - Granen e.d. zijn als "gemengd" ingedeeld omdat het merendeel van het
   Nederlandse graan als veevoer wordt gebruikt.
 - Bron: BRP Gewaspercelen & Natura 2000 (RVO), Bestuurlijke Gebieden

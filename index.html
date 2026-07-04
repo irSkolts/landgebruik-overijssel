@@ -21,6 +21,8 @@
     --c-other: #898781;
     --c-natura: #008300;
     --c-zone: #d03b3b;
+    --c-zone500: #ec835a;
+    --c-zone1000: #d03b3b;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { height: 100%; }
@@ -49,11 +51,17 @@
     width: 14px; height: 14px; border-radius: 3px; flex: none;
     border: 1px solid rgba(11,11,11,0.25);
   }
-  .chip.hatch {
+  .chip.hatch-500 {
     background:
       repeating-linear-gradient(45deg, transparent 0 3px,
-        var(--c-zone) 3px 4.5px);
-    border: 1.5px dashed var(--c-zone);
+        var(--c-zone500) 3px 4.5px);
+    border: 1.5px dashed var(--c-zone500);
+  }
+  .chip.hatch-1000 {
+    background:
+      repeating-linear-gradient(45deg, transparent 0 3px,
+        var(--c-zone1000) 3px 4.5px);
+    border: 1.5px dashed var(--c-zone1000);
   }
   .chip.hatch-dark {
     background:
@@ -136,11 +144,14 @@
   <label class="row"><input type="checkbox" id="ck-natura" checked>
     <span class="chip" style="background:var(--c-natura);opacity:.75"></span>
     <span class="lbl">Natura 2000-gebieden</span></label>
-  <label class="row"><input type="checkbox" id="ck-zone" checked>
-    <span class="chip hatch"></span>
-    <span class="lbl">Zone &lt; 1 km van Natura 2000</span></label>
+  <label class="row"><input type="checkbox" id="ck-zone500" checked>
+    <span class="chip hatch-500"></span>
+    <span class="lbl">Stikstofzone 500 m</span></label>
+  <label class="row"><input type="checkbox" id="ck-zone1000" checked>
+    <span class="chip hatch-1000"></span>
+    <span class="lbl">Stikstofzone 1 km <span id="n1000"></span></span></label>
   <label class="row"><input type="checkbox" id="ck-hatch" checked>
-    <span class="chip hatch hatch-dark"></span>
+    <span class="chip hatch-dark"></span>
     <span class="lbl">Markeer percelen in de zone</span></label>
 
   <div id="stats">
@@ -151,9 +162,11 @@
   </div>
 
   <div class="note" id="note">
-    <b>Let op:</b> de 1&nbsp;km-zone is een geometrische benadering van de
-    aangekondigde strengste stikstofrestricties rond Natura 2000; de
-    uiteindelijke juridische begrenzing kan afwijken.
+    <b>Let op:</b> de zonebreedte volgt het kabinetsvoornemen
+    (Verdiepingsbijlage Hoofdlijn 3, 2025): 500&nbsp;m rond de meeste
+    stikstofgevoelige Natura 2000-gebieden, 1&nbsp;km rond enkele. Grote
+    wateren krijgen geen zone. Dit is een voorlopige, geometrische benadering;
+    de definitieve juridische begrenzing kan afwijken.
     Bron: BRP Gewaspercelen &amp; Natura 2000 (RVO) via PDOK.
   </div>
 </div>
@@ -169,7 +182,9 @@ const CAT_NL = { L: "Veehouderij (gras & voer)", H: "Menselijke voeding",
                  M: "Gemengd / dual-use", O: "Overig agrarisch" };
 
 document.getElementById("subtitle").textContent =
-  `BRP ${META.year} · gebouwd ${META.built} · veehouderij vs. voeding · Natura 2000 + ${META.buffer_m/1000} km zone`;
+  `BRP ${META.year} · gebouwd ${META.built} · veehouderij vs. voeding · Natura 2000 + stikstofzone (500 m / 1 km)`;
+document.getElementById("n1000").textContent =
+  `(${META.areas_1000.length} gebieden)`;
 
 // ---- stats panel ------------------------------------------------------
 const fmt = n => n.toLocaleString("nl-NL");
@@ -222,7 +237,8 @@ function hatchImage(color, px = 10, lw = 2.2) {
 }
 
 map.on("load", () => {
-  map.addImage("hatch-zone", hatchImage("#d03b3b"), { pixelRatio: 2 });
+  map.addImage("hatch-zone-500", hatchImage("#ec835a"), { pixelRatio: 2 });
+  map.addImage("hatch-zone-1000", hatchImage("#d03b3b"), { pixelRatio: 2 });
   map.addImage("hatch-parcel", hatchImage("#7a1717"), { pixelRatio: 2 });
 
   map.addSource("parcels", { type: "geojson", data: PARCELS });
@@ -269,16 +285,21 @@ map.on("load", () => {
     paint: { "line-color": "#005a00", "line-width": 1.4 }
   });
 
-  // 1 km nitrogen zone: hatch + dashed boundary (pattern, not color-alone)
-  map.addLayer({
-    id: "zone-fill", type: "fill", source: "zone",
-    paint: { "fill-pattern": "hatch-zone", "fill-opacity": 0.55 }
-  });
-  map.addLayer({
-    id: "zone-line", type: "line", source: "zone",
-    paint: { "line-color": "#d03b3b", "line-width": 1.6,
-             "line-dasharray": [3, 2] }
-  });
+  // nitrogen zones: one fill+line per policy width (500 m orange, 1 km red),
+  // hatched + dashed so severity reads without relying on color alone
+  for (const w of [500, 1000]) {
+    map.addLayer({
+      id: "zone-fill-" + w, type: "fill", source: "zone",
+      filter: ["==", ["get", "w"], w],
+      paint: { "fill-pattern": "hatch-zone-" + w, "fill-opacity": 0.55 }
+    });
+    map.addLayer({
+      id: "zone-line-" + w, type: "line", source: "zone",
+      filter: ["==", ["get", "w"], w],
+      paint: { "line-color": w === 1000 ? "#d03b3b" : "#ec835a",
+               "line-width": 1.6, "line-dasharray": [3, 2] }
+    });
+  }
 
   map.addLayer({
     id: "province-line", type: "line", source: "province",
@@ -295,7 +316,7 @@ function visibleCats() {
     document.getElementById("ck-" + c).checked);
 }
 function zoneHatchFilter() {
-  return ["all", ["==", ["get", "z"], 1],
+  return ["all", [">", ["get", "z"], 0],
           ["in", ["get", "c"], ["literal", visibleCats()]]];
 }
 function wireToggles() {
@@ -308,11 +329,14 @@ function wireToggles() {
     vis("parcels-zone-hatch", document.getElementById("ck-hatch").checked);
     const n = document.getElementById("ck-natura").checked;
     vis("natura-fill", n); vis("natura-line", n);
-    const z = document.getElementById("ck-zone").checked;
-    vis("zone-fill", z); vis("zone-line", z);
+    for (const w of [500, 1000]) {
+      const on = document.getElementById("ck-zone" + w).checked;
+      vis("zone-fill-" + w, on); vis("zone-line-" + w, on);
+    }
     vis("nnn-fill", document.getElementById("ck-nnn").checked);
   };
-  for (const id of ["ck-L", "ck-H", "ck-M", "ck-O", "ck-nnn", "ck-natura", "ck-zone", "ck-hatch"])
+  for (const id of ["ck-L", "ck-H", "ck-M", "ck-O", "ck-nnn", "ck-natura",
+                    "ck-zone500", "ck-zone1000", "ck-hatch"])
     document.getElementById(id).addEventListener("change", refresh);
   refresh();
 }
@@ -337,9 +361,13 @@ map.on("click", e => {
       <div class="pop-cat"><span style="width:10px;height:10px;border-radius:2px;
         background:${COLORS[p.c]};display:inline-block"></span>${CAT_NL[p.c]}</div>
       <div class="pop-ok">${p.h.toLocaleString("nl-NL")} ha</div>` +
-      (p.z ? `<div class="pop-zone">&#9888; binnen 1 km van Natura 2000
-                (strengste stikstofrestricties)</div>`
-           : `<div class="pop-ok">buiten de 1 km-stikstofzone</div>`);
+      (p.z === 1000
+        ? `<div class="pop-zone">&#9888; binnen 1 km-zone van Natura 2000
+             (strengste stikstofrestricties)</div>`
+        : p.z === 500
+        ? `<div class="pop-zone">&#9888; binnen 500 m-zone van Natura 2000
+             (stikstofrestricties)</div>`
+        : `<div class="pop-ok">buiten de stikstofzone</div>`);
   }
   new maplibregl.Popup({ maxWidth: "280px" })
     .setLngLat(e.lngLat).setHTML(html).addTo(map);
