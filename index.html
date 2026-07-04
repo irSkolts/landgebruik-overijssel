@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Overijssel — landgebruik, veehouderij &amp; Natura 2000</title>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css">
+<script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+<style>
+  :root {
+    --surface: #fcfcfb;
+    --page: #f9f9f7;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #898781;
+    --hairline: #e1e0d9;
+    --border: rgba(11,11,11,0.10);
+    --c-livestock: #eda100;
+    --c-human: #2a78d6;
+    --c-mixed: #e87ba4;
+    --c-other: #898781;
+    --c-natura: #008300;
+    --c-zone: #d03b3b;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: var(--ink);
+  }
+  #map { position: absolute; inset: 0; }
+
+  #panel {
+    position: absolute; top: 12px; left: 12px; z-index: 10;
+    width: 320px; max-height: calc(100% - 24px); overflow-y: auto;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; box-shadow: 0 2px 10px rgba(11,11,11,0.12);
+    padding: 14px 16px;
+  }
+  #panel h1 { font-size: 15px; font-weight: 650; margin-bottom: 2px; }
+  #panel .sub { color: var(--ink-2); font-size: 12px; margin-bottom: 10px; }
+  #panel h2 {
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.04em; color: var(--muted); margin: 12px 0 6px;
+  }
+  .row { display: flex; align-items: center; gap: 8px; padding: 3px 0; cursor: pointer; }
+  .row input { accent-color: var(--ink-2); cursor: pointer; }
+  .chip {
+    width: 14px; height: 14px; border-radius: 3px; flex: none;
+    border: 1px solid rgba(11,11,11,0.25);
+  }
+  .chip.hatch {
+    background:
+      repeating-linear-gradient(45deg, transparent 0 3px,
+        var(--c-zone) 3px 4.5px);
+    border: 1.5px dashed var(--c-zone);
+  }
+  .chip.hatch-dark {
+    background:
+      repeating-linear-gradient(45deg, transparent 0 3px,
+        #7a1717 3px 4.5px);
+  }
+  .row .lbl { flex: 1; }
+  .row .ha { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 12px; }
+
+  #stats { border-top: 1px solid var(--hairline); margin-top: 12px; padding-top: 10px; }
+  #stats table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  #stats th {
+    text-align: right; font-weight: 500; color: var(--muted);
+    padding: 2px 0 4px; font-size: 11px;
+  }
+  #stats th:first-child { text-align: left; }
+  #stats td {
+    padding: 2px 0; text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  #stats td:first-child { text-align: left; }
+  #stats td.zone-col { color: var(--c-zone); font-weight: 600; }
+
+  .note {
+    margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--hairline);
+    color: var(--ink-2); font-size: 11px;
+  }
+  .note b { color: var(--ink); }
+
+  #loading {
+    position: absolute; inset: 0; z-index: 20;
+    background: var(--page); display: flex; align-items: center;
+    justify-content: center; flex-direction: column; gap: 10px;
+    color: var(--ink-2); font-size: 14px;
+    transition: opacity .4s;
+  }
+  #loading.hide { opacity: 0; pointer-events: none; }
+  .spin {
+    width: 26px; height: 26px; border-radius: 50%;
+    border: 3px solid var(--hairline); border-top-color: var(--c-human);
+    animation: r 0.9s linear infinite;
+  }
+  @keyframes r { to { transform: rotate(360deg); } }
+
+  .maplibregl-popup-content {
+    font: 12px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    padding: 10px 12px; border-radius: 8px;
+  }
+  .maplibregl-popup-content b { font-size: 13px; }
+  .pop-cat { display: flex; align-items: center; gap: 6px; margin-top: 3px; }
+  .pop-zone { color: var(--c-zone); font-weight: 600; margin-top: 3px; }
+  .pop-ok { color: var(--ink-2); margin-top: 3px; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div id="panel">
+  <h1>Overijssel — landgebruik</h1>
+  <div class="sub" id="subtitle">Veehouderij vs. menselijke voeding · Natura 2000 · stikstofzone</div>
+
+  <h2>Gewaspercelen</h2>
+  <label class="row"><input type="checkbox" id="ck-L" checked>
+    <span class="chip" style="background:var(--c-livestock)"></span>
+    <span class="lbl">Veehouderij (gras &amp; voer)</span><span class="ha" id="ha-L"></span></label>
+  <label class="row"><input type="checkbox" id="ck-H" checked>
+    <span class="chip" style="background:var(--c-human)"></span>
+    <span class="lbl">Menselijke voeding</span><span class="ha" id="ha-H"></span></label>
+  <label class="row"><input type="checkbox" id="ck-M" checked>
+    <span class="chip" style="background:var(--c-mixed)"></span>
+    <span class="lbl">Gemengd / dual-use</span><span class="ha" id="ha-M"></span></label>
+  <label class="row"><input type="checkbox" id="ck-O">
+    <span class="chip" style="background:var(--c-other);opacity:.5"></span>
+    <span class="lbl">Overig agrarisch</span><span class="ha" id="ha-O"></span></label>
+
+  <h2>Natuur &amp; stikstof</h2>
+  <label class="row"><input type="checkbox" id="ck-natura" checked>
+    <span class="chip" style="background:var(--c-natura);opacity:.75"></span>
+    <span class="lbl">Natura 2000-gebieden</span></label>
+  <label class="row"><input type="checkbox" id="ck-zone" checked>
+    <span class="chip hatch"></span>
+    <span class="lbl">Zone &lt; 1 km van Natura 2000</span></label>
+  <label class="row"><input type="checkbox" id="ck-hatch" checked>
+    <span class="chip hatch hatch-dark"></span>
+    <span class="lbl">Markeer percelen in de zone</span></label>
+
+  <div id="stats">
+    <h2 style="margin-top:0">Hectare per categorie</h2>
+    <table id="stat-table">
+      <tr><th>categorie</th><th>totaal</th><th>in zone</th><th>%</th></tr>
+    </table>
+  </div>
+
+  <div class="note" id="note">
+    <b>Let op:</b> de 1&nbsp;km-zone is een geometrische benadering van de
+    aangekondigde strengste stikstofrestricties rond Natura 2000; de
+    uiteindelijke juridische begrenzing kan afwijken.
+    Bron: BRP Gewaspercelen &amp; Natura 2000 (RVO) via PDOK.
+  </div>
+</div>
+
+<div id="loading"><div class="spin"></div><div>Percelen laden…</div></div>
+
+<script src="data/province.js"></script>
+<script src="data/natura2000.js"></script>
+<script src="data/parcels.js"></script>
+<script>
+const COLORS = { L: "#eda100", H: "#2a78d6", M: "#e87ba4", O: "#898781" };
+const CAT_NL = { L: "Veehouderij (gras & voer)", H: "Menselijke voeding",
+                 M: "Gemengd / dual-use", O: "Overig agrarisch" };
+
+document.getElementById("subtitle").textContent =
+  `BRP ${META.year} · gebouwd ${META.built} · veehouderij vs. voeding · Natura 2000 + ${META.buffer_m/1000} km zone`;
+
+// ---- stats panel ------------------------------------------------------
+const fmt = n => n.toLocaleString("nl-NL");
+const tbl = document.getElementById("stat-table");
+for (const c of ["L", "H", "M", "O"]) {
+  const s = META.stats[c];
+  document.getElementById("ha-" + c).textContent = fmt(s.ha) + " ha";
+  const pct = s.ha ? Math.round(100 * s.ha_zone / s.ha) : 0;
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td><span class="chip" style="background:${COLORS[c]};display:inline-block;
+      width:9px;height:9px;border-radius:2px;margin-right:5px"></span>${CAT_NL[c]}</td>
+    <td>${fmt(s.ha)}</td><td class="zone-col">${fmt(s.ha_zone)}</td><td>${pct}%</td>`;
+  tbl.appendChild(tr);
+}
+
+// ---- map --------------------------------------------------------------
+const map = new maplibregl.Map({
+  container: "map",
+  style: {
+    version: 8,
+    sources: {
+      brt: {
+        type: "raster",
+        tiles: ["https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/grijs/EPSG:3857/{z}/{x}/{y}.png"],
+        tileSize: 256,
+        attribution: "Kaart: &copy; <a href='https://www.kadaster.nl'>Kadaster</a> | Data: RVO via <a href='https://www.pdok.nl'>PDOK</a>"
+      }
+    },
+    layers: [{ id: "brt", type: "raster", source: "brt" }]
+  },
+  bounds: [[5.78, 52.11], [7.10, 52.87]],
+  fitBoundsOptions: { padding: 20 },
+  maxZoom: 17
+});
+map.addControl(new maplibregl.NavigationControl(), "top-right");
+map.addControl(new maplibregl.ScaleControl({ unit: "metric" }));
+
+// diagonal hatch tiles, drawn on a canvas (fill-pattern needs an image)
+function hatchImage(color, px = 10, lw = 2.2) {
+  const c = document.createElement("canvas");
+  c.width = c.height = px;
+  const g = c.getContext("2d");
+  g.strokeStyle = color; g.lineWidth = lw; g.lineCap = "square";
+  g.beginPath();
+  g.moveTo(-px / 2, px * 1.5); g.lineTo(px * 1.5, -px / 2);
+  g.moveTo(-px / 2, px / 2);   g.lineTo(px / 2, -px / 2);
+  g.moveTo(px / 2, px * 1.5);  g.lineTo(px * 1.5, px / 2);
+  g.stroke();
+  return g.getImageData(0, 0, px, px);
+}
+
+map.on("load", () => {
+  map.addImage("hatch-zone", hatchImage("#d03b3b"), { pixelRatio: 2 });
+  map.addImage("hatch-parcel", hatchImage("#7a1717"), { pixelRatio: 2 });
+
+  map.addSource("parcels", { type: "geojson", data: PARCELS });
+  map.addSource("natura", { type: "geojson", data: NATURA });
+  map.addSource("zone", { type: "geojson", data: ZONE });
+  map.addSource("province", { type: "geojson", data: PROVINCE });
+
+  // category fills — one layer per category so checkboxes map 1:1
+  for (const c of ["O", "M", "H", "L"]) {
+    map.addLayer({
+      id: "parcels-" + c, type: "fill", source: "parcels",
+      filter: ["==", ["get", "c"], c],
+      paint: { "fill-color": COLORS[c],
+               "fill-opacity": c === "O" ? 0.35 : 0.55 }
+    });
+  }
+  map.addLayer({
+    id: "parcels-outline", type: "line", source: "parcels", minzoom: 12,
+    paint: { "line-color": "#52514e", "line-width": 0.5, "line-opacity": 0.45 }
+  });
+
+  // red hatch on parcels inside the 1 km zone (visible categories only)
+  map.addLayer({
+    id: "parcels-zone-hatch", type: "fill", source: "parcels",
+    filter: zoneHatchFilter(),
+    paint: { "fill-pattern": "hatch-parcel", "fill-opacity": 0.7 }
+  });
+
+  // Natura 2000
+  map.addLayer({
+    id: "natura-fill", type: "fill", source: "natura",
+    paint: { "fill-color": "#008300", "fill-opacity": 0.32 }
+  });
+  map.addLayer({
+    id: "natura-line", type: "line", source: "natura",
+    paint: { "line-color": "#005a00", "line-width": 1.4 }
+  });
+
+  // 1 km nitrogen zone: hatch + dashed boundary (pattern, not color-alone)
+  map.addLayer({
+    id: "zone-fill", type: "fill", source: "zone",
+    paint: { "fill-pattern": "hatch-zone", "fill-opacity": 0.55 }
+  });
+  map.addLayer({
+    id: "zone-line", type: "line", source: "zone",
+    paint: { "line-color": "#d03b3b", "line-width": 1.6,
+             "line-dasharray": [3, 2] }
+  });
+
+  map.addLayer({
+    id: "province-line", type: "line", source: "province",
+    paint: { "line-color": "#0b0b0b", "line-width": 1.8, "line-opacity": 0.7 }
+  });
+
+  wireToggles();
+  document.getElementById("loading").classList.add("hide");
+});
+
+// ---- toggles ----------------------------------------------------------
+function visibleCats() {
+  return ["L", "H", "M", "O"].filter(c =>
+    document.getElementById("ck-" + c).checked);
+}
+function zoneHatchFilter() {
+  return ["all", ["==", ["get", "z"], 1],
+          ["in", ["get", "c"], ["literal", visibleCats()]]];
+}
+function wireToggles() {
+  const vis = (id, on) =>
+    map.setLayoutProperty(id, "visibility", on ? "visible" : "none");
+  const refresh = () => {
+    for (const c of ["L", "H", "M", "O"])
+      vis("parcels-" + c, document.getElementById("ck-" + c).checked);
+    map.setFilter("parcels-zone-hatch", zoneHatchFilter());
+    vis("parcels-zone-hatch", document.getElementById("ck-hatch").checked);
+    const n = document.getElementById("ck-natura").checked;
+    vis("natura-fill", n); vis("natura-line", n);
+    const z = document.getElementById("ck-zone").checked;
+    vis("zone-fill", z); vis("zone-line", z);
+  };
+  for (const id of ["ck-L", "ck-H", "ck-M", "ck-O", "ck-natura", "ck-zone", "ck-hatch"])
+    document.getElementById(id).addEventListener("change", refresh);
+  refresh();
+}
+
+// ---- popups -----------------------------------------------------------
+const parcelLayers = ["parcels-L", "parcels-H", "parcels-M", "parcels-O"];
+map.on("click", e => {
+  // parcels win over the Natura 2000 fill when both are under the cursor
+  let fs = map.queryRenderedFeatures(e.point,
+    { layers: parcelLayers.filter(l => map.getLayer(l)) });
+  if (!fs.length && map.getLayer("natura-fill"))
+    fs = map.queryRenderedFeatures(e.point, { layers: ["natura-fill"] });
+  if (!fs.length) return;
+  const f = fs[0];
+  let html;
+  if (f.layer.id === "natura-fill") {
+    html = `<b>${f.properties.naam}</b>
+      <div class="pop-ok">Natura 2000-gebied (${f.properties.bescherming})</div>`;
+  } else {
+    const p = f.properties;
+    html = `<b>${META.crops[p.g] || "gewascode " + p.g}</b>
+      <div class="pop-cat"><span style="width:10px;height:10px;border-radius:2px;
+        background:${COLORS[p.c]};display:inline-block"></span>${CAT_NL[p.c]}</div>
+      <div class="pop-ok">${p.h.toLocaleString("nl-NL")} ha</div>` +
+      (p.z ? `<div class="pop-zone">&#9888; binnen 1 km van Natura 2000
+                (strengste stikstofrestricties)</div>`
+           : `<div class="pop-ok">buiten de 1 km-stikstofzone</div>`);
+  }
+  new maplibregl.Popup({ maxWidth: "280px" })
+    .setLngLat(e.lngLat).setHTML(html).addTo(map);
+});
+map.on("mousemove", e => {
+  const fs = map.queryRenderedFeatures(e.point,
+    { layers: parcelLayers.filter(l => map.getLayer(l)) });
+  map.getCanvas().style.cursor = fs.length ? "pointer" : "";
+});
+</script>
+</body>
+</html>
