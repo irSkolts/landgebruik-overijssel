@@ -130,6 +130,9 @@
     <span class="lbl">Overig agrarisch</span><span class="ha" id="ha-O"></span></label>
 
   <h2>Natuur &amp; stikstof</h2>
+  <label class="row"><input type="checkbox" id="ck-nnn" checked>
+    <span class="chip" style="background:#1baf7a;opacity:.35"></span>
+    <span class="lbl">Natuurnetwerk Nederland (NNN)</span></label>
   <label class="row"><input type="checkbox" id="ck-natura" checked>
     <span class="chip" style="background:var(--c-natura);opacity:.75"></span>
     <span class="lbl">Natura 2000-gebieden</span></label>
@@ -225,6 +228,7 @@ map.on("load", () => {
   map.addSource("parcels", { type: "geojson", data: PARCELS });
   map.addSource("natura", { type: "geojson", data: NATURA });
   map.addSource("zone", { type: "geojson", data: ZONE });
+  map.addSource("nnn", { type: "geojson", data: NNN });
   map.addSource("province", { type: "geojson", data: PROVINCE });
 
   // category fills — one layer per category so checkboxes map 1:1
@@ -246,6 +250,13 @@ map.on("load", () => {
     id: "parcels-zone-hatch", type: "fill", source: "parcels",
     filter: zoneHatchFilter(),
     paint: { "fill-pattern": "hatch-parcel", "fill-opacity": 0.7 }
+  });
+
+  // NNN below Natura 2000: light wash, no outline, so the darker
+  // outlined N2000 areas stay distinguishable on top of it
+  map.addLayer({
+    id: "nnn-fill", type: "fill", source: "nnn",
+    paint: { "fill-color": "#1baf7a", "fill-opacity": 0.22 }
   });
 
   // Natura 2000
@@ -299,8 +310,9 @@ function wireToggles() {
     vis("natura-fill", n); vis("natura-line", n);
     const z = document.getElementById("ck-zone").checked;
     vis("zone-fill", z); vis("zone-line", z);
+    vis("nnn-fill", document.getElementById("ck-nnn").checked);
   };
-  for (const id of ["ck-L", "ck-H", "ck-M", "ck-O", "ck-natura", "ck-zone", "ck-hatch"])
+  for (const id of ["ck-L", "ck-H", "ck-M", "ck-O", "ck-nnn", "ck-natura", "ck-zone", "ck-hatch"])
     document.getElementById(id).addEventListener("change", refresh);
   refresh();
 }

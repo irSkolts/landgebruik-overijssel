@@ -9,6 +9,8 @@ Interactieve kaart van de provincie Overijssel met:
     (deels voedsel, deels veevoer/industrie)
   - **Overig agrarisch** — bollen, sierteelt, natuurbeheer, braak
 - **Natura 2000-gebieden** (RVO)
+- **Natuurnetwerk Nederland (NNN)** (provincies, via PDOK) — lichte groene
+  waas onder de Natura 2000-gebieden (63.205 ha in Overijssel)
 - De **zone binnen 1 km** van Natura 2000, waar volgens de aangekondigde
   plannen de strengste stikstofrestricties gaan gelden. Percelen in die zone
   worden gearceerd weergegeven.
@@ -38,6 +40,24 @@ scheelt ook ruimte in OneDrive, het is een paar honderd MB).
 De gewasindeling staat bovenin `build_data.py` (`RULES`) en is daar
 aan te passen; onbekende gewassen komen in "Overig" en worden bij het
 bouwen gelogd.
+
+## Validatie t.o.v. CBS
+
+`python check_cbs.py` vergelijkt de kaartcategorieën met de
+CBS-landbouwtelling (StatLine 80780ned, zelfde jaar). Resultaat voor 2025:
+
+| categorie | kaart (ha) | CBS (ha) | verschil |
+|---|---:|---:|---:|
+| Veehouderij (gras/voer) | 171.194 | 173.441 | −1,3% |
+| Menselijke voeding | 5.856 | 7.289 | −19,7% |
+| Gemengd / dual-use | 10.969 | 11.455 | −4,2% |
+| Totaal cultuurgrond | 196.951 | 195.525 | +0,7% |
+
+Het verschil bij "menselijke voeding" (±1.400 ha op een kleine categorie)
+past bij het bekende definitieverschil: CBS telt grond bij de provincie van
+de hoofdvestiging van het bedrijf, en Overijsselse aardappel-/uientelers
+huren veel wisselgrond in Flevoland en Drenthe. De kaart telt naar
+perceellocatie.
 
 ## Kanttekeningen
 

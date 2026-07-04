@@ -38,6 +38,9 @@ RAW = DATA / "raw"
 WFS_BRP = "https://service.pdok.nl/rvo/brpgewaspercelen/wfs/v1_0"
 WFS_N2K = "https://service.pdok.nl/rvo/natura2000/wfs/v1_0"
 WFS_BG = "https://service.pdok.nl/kadaster/bestuurlijkegebieden/wfs/v1_0"
+# NNN has no WFS; only this INSPIRE ATOM download (GML, whole NL, ~185 MB)
+NNN_GML = ("https://service.pdok.nl/provincies/natuurnetwerk-nederland/"
+           "atom/downloads/inspire-pv-ps.nlps-nnn.gml")
 
 RD = "EPSG:28992"  # Dutch national grid, metres
 WGS = "EPSG:4326"
@@ -236,6 +239,35 @@ def get_natura():
     return gdf
 
 
+def get_nnn(prov_geom):
+    """Natuurnetwerk Nederland, clipped to the province, dissolved (RD)."""
+    cache = RAW / "nnn_overijssel.gpkg"
+    if cache.exists():
+        return gpd.read_file(cache).geometry.union_all()
+    gml = RAW / "nnn.gml"
+    if not gml.exists():
+        log("Downloading NNN (INSPIRE GML, ~185 MB, one-off)...")
+        with session.get(NNN_GML, stream=True, timeout=120) as r:
+            r.raise_for_status()
+            tmp = gml.with_suffix(".part")
+            with open(tmp, "wb") as fh:
+                for chunk in r.iter_content(1 << 20):
+                    fh.write(chunk)
+            tmp.rename(gml)
+    log("Reading NNN GML (whole NL, takes a few minutes)...")
+    nnn = gpd.read_file(gml)
+    if nnn.crs is None:
+        nnn = nnn.set_crs(RD)
+    nnn = nnn.to_crs(RD)
+    nnn["geometry"] = shapely.make_valid(nnn.geometry.values)
+    idx = nnn.sindex.query(prov_geom, predicate="intersects")
+    clipped = nnn.iloc[sorted(idx)].geometry.union_all().intersection(prov_geom)
+    out = gpd.GeoDataFrame({"id": [1]}, geometry=[clipped], crs=RD)
+    out.to_file(cache, driver="GPKG")
+    log(f"NNN in Overijssel: {clipped.area / 1e4:.0f} ha")
+    return clipped
+
+
 def get_parcels(bounds):
     cache = RAW / "brp_bbox.gpkg"
     if cache.exists():
@@ -350,7 +382,12 @@ def main():
     zone_gdf = gpd.GeoDataFrame({"id": [1]}, geometry=[
         shapely.simplify(ring_clip, SIMPLIFY_AREA_M)], crs=RD).to_crs(WGS)
     zone_fc = to_fc(zone_gdf, {"id": "id"})
-    write_js(DATA / "natura2000.js", NATURA=natura_fc, ZONE=zone_fc)
+
+    nnn_geom = get_nnn(prov_geom)
+    nnn_gdf = gpd.GeoDataFrame({"id": [1]}, geometry=[
+        shapely.simplify(nnn_geom, SIMPLIFY_AREA_M)], crs=RD).to_crs(WGS)
+    nnn_fc = to_fc(nnn_gdf, {"id": "id"})
+    write_js(DATA / "natura2000.js", NATURA=natura_fc, ZONE=zone_fc, NNN=nnn_fc)
 
     prov_gdf = gpd.GeoDataFrame({"naam": ["Overijssel"]}, geometry=[
         shapely.simplify(prov_geom, SIMPLIFY_AREA_M)], crs=RD).to_crs(WGS)
