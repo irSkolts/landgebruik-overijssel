@@ -22,9 +22,20 @@ Interactieve kaart van de provincie Overijssel met:
 
 ## Gebruik
 
-Dubbelklik op `index.html` — de kaart opent in de browser. Internet is alleen
-nodig voor de achtergrondkaart (PDOK) en de MapLibre-bibliotheek; alle
-perceeldata staat lokaal in `data/`.
+De live kaart staat op **https://landgebruikoverijssel.nl**.
+
+Lokaal bekijken kan niet meer met dubbelklik op `index.html`: de percelen
+worden als vector-tiles uit één `data/parcels.pmtiles` geladen, en dat vereist
+HTTP (range requests) in plaats van `file://`. Start daarom een klein
+webservertje in de projectmap en open de getoonde URL:
+
+```
+python -m http.server 8000
+# open http://localhost:8000
+```
+
+Internet is verder alleen nodig voor de achtergrondkaart (PDOK) en de
+JS-bibliotheken (MapLibre + PMTiles); alle overige data staat lokaal in `data/`.
 
 - Vink lagen aan/uit in het paneel linksboven.
 - Klik op een perceel voor gewas, oppervlakte en zonestatus.
@@ -34,17 +45,24 @@ perceeldata staat lokaal in `data/`.
 ## Data verversen
 
 ```
-python build_data.py
+python build_data.py        # download + verwerk PDOK-data
+npm install                 # eenmalig: tiling-libs (geojson-vt, vt-pbf, pmtiles)
+node make_tiles.mjs         # bouw data/parcels.pmtiles uit parcels.geojson
 ```
 
-Downloadt de actuele data van PDOK (eenmalig ± 10–15 min) en schrijft
-`data/parcels.js`, `data/natura2000.js` en `data/province.js`. De ruwe
-download wordt gecachet in `data/raw/` (mag weg om opnieuw te downloaden —
-scheelt ook ruimte in OneDrive, het is een paar honderd MB).
+`build_data.py` downloadt de actuele data van PDOK (eenmalig ± 10–15 min) en
+schrijft `data/parcels.geojson`, `data/natura2000.js` en `data/province.js`.
+`make_tiles.mjs` snijdt de percelen tot vector-tiles in `data/parcels.pmtiles`
+(het bestand dat de kaart gebruikt). De ruwe download en de tussenliggende
+`parcels.geojson` worden gecachet resp. genegeerd (`data/raw/`, `.gitignore`).
 
-De gewasindeling staat bovenin `build_data.py` (`RULES`) en is daar
-aan te passen; onbekende gewassen komen in "Overig" en worden bij het
-bouwen gelogd.
+Waarom PMTiles: de browser haalt alleen de tegels van het huidige beeld op
+(~1–1,5 MB voor heel Overijssel, minder bij inzoomen) in plaats van het hele
+bestand van 66 MB — veel snellere eerste lading.
+
+De gewasindeling (`RULES`) en de zonebreedtes (`ZONE_WIDTH`) staan bovenin
+`build_data.py` en zijn daar aan te passen; onbekende gewassen komen in
+"Overig" en worden bij het bouwen gelogd.
 
 ## Validatie t.o.v. CBS
 

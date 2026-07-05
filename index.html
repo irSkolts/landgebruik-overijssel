@@ -6,6 +6,7 @@
 <title>Overijssel — landgebruik, veehouderij &amp; Natura 2000</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css">
 <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/pmtiles@4.4.1/dist/pmtiles.js"></script>
 <style>
   :root {
     --surface: #fcfcfb;
@@ -175,7 +176,6 @@
 
 <script src="data/province.js"></script>
 <script src="data/natura2000.js"></script>
-<script src="data/parcels.js"></script>
 <script>
 const COLORS = { L: "#eda100", H: "#2a78d6", M: "#e87ba4", O: "#898781" };
 const CAT_NL = { L: "Veehouderij (gras & voer)", H: "Menselijke voeding",
@@ -201,6 +201,14 @@ for (const c of ["L", "H", "M", "O"]) {
 }
 
 // ---- map --------------------------------------------------------------
+// parcels are served as vector tiles from a single PMTiles file, so the
+// browser only downloads the tiles for the current view (~KBs) instead of
+// the whole 66 MB dataset. Requires HTTP (range requests) — see README.
+const pmProtocol = new pmtiles.Protocol();
+maplibregl.addProtocol("pmtiles", pmProtocol.tile);
+const PARCELS_PMTILES = "pmtiles://" +
+  new URL("data/parcels.pmtiles", location.href).href;
+
 const map = new maplibregl.Map({
   container: "map",
   style: {
@@ -241,7 +249,7 @@ map.on("load", () => {
   map.addImage("hatch-zone-1000", hatchImage("#d03b3b"), { pixelRatio: 2 });
   map.addImage("hatch-parcel", hatchImage("#7a1717"), { pixelRatio: 2 });
 
-  map.addSource("parcels", { type: "geojson", data: PARCELS });
+  map.addSource("parcels", { type: "vector", url: PARCELS_PMTILES });
   map.addSource("natura", { type: "geojson", data: NATURA });
   map.addSource("zone", { type: "geojson", data: ZONE });
   map.addSource("nnn", { type: "geojson", data: NNN });
@@ -251,19 +259,22 @@ map.on("load", () => {
   for (const c of ["O", "M", "H", "L"]) {
     map.addLayer({
       id: "parcels-" + c, type: "fill", source: "parcels",
+      "source-layer": "parcels",
       filter: ["==", ["get", "c"], c],
       paint: { "fill-color": COLORS[c],
                "fill-opacity": c === "O" ? 0.35 : 0.55 }
     });
   }
   map.addLayer({
-    id: "parcels-outline", type: "line", source: "parcels", minzoom: 12,
+    id: "parcels-outline", type: "line", source: "parcels",
+    "source-layer": "parcels", minzoom: 12,
     paint: { "line-color": "#52514e", "line-width": 0.5, "line-opacity": 0.45 }
   });
 
   // red hatch on parcels inside the 1 km zone (visible categories only)
   map.addLayer({
     id: "parcels-zone-hatch", type: "fill", source: "parcels",
+    "source-layer": "parcels",
     filter: zoneHatchFilter(),
     paint: { "fill-pattern": "hatch-parcel", "fill-opacity": 0.7 }
   });

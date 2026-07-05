@@ -432,7 +432,14 @@ def main():
     parcels = parcels[~parcels.geometry.is_empty]
     parcels_w = parcels.to_crs(WGS)
     fc = to_fc(parcels_w, {"g": "gewascode", "c": "cat", "h": "ha", "z": "z"})
-    write_js(DATA / "parcels.js", PARCELS=fc)
+    # plain GeoJSON, consumed by make_tiles.mjs to build data/parcels.pmtiles
+    # (kept out of git; the committed artifact is the .pmtiles). Run
+    # `node make_tiles.mjs` after this script.
+    gj = DATA / "parcels.geojson"
+    gj.write_text(json.dumps(fc, ensure_ascii=False, separators=(",", ":")),
+                  encoding="utf-8")
+    log(f"  wrote {gj.name} ({gj.stat().st_size / 1e6:.1f} MB) "
+        "-> run `node make_tiles.mjs` to build parcels.pmtiles")
 
     near["geometry"] = near.geometry.simplify(SIMPLIFY_AREA_M)
     natura_w = near.to_crs(WGS)
