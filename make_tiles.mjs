@@ -19,7 +19,7 @@ import { PMTiles, zxyToTileId } from "pmtiles";
 const SRC = "data/parcels.geojson";
 const OUT = "data/parcels.pmtiles";
 const LAYER = "parcels";
-const MINZOOM = 8;
+const MINZOOM = 7;   // province fits a tall phone screen at ~z7.5
 const MAXZOOM = 14;
 const EXTENT = 4096;
 

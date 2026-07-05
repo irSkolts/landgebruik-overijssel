@@ -41,6 +41,22 @@
     border-radius: 10px; box-shadow: 0 2px 10px rgba(11,11,11,0.12);
     padding: 14px 16px;
   }
+  #panel-head {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; cursor: pointer; user-select: none;
+  }
+  #panel-head h1 { margin-bottom: 0; }
+  #panel-toggle {
+    flex: none; width: 26px; height: 26px; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--page);
+    color: var(--ink-2); font-size: 13px; line-height: 24px; text-align: center;
+  }
+  #panel-body { margin-top: 8px; }
+  #panel.collapsed { width: auto; overflow: visible; }
+  #panel.collapsed #panel-body { display: none; }
+  @media (max-width: 600px) {
+    #panel { width: calc(100vw - 24px); max-width: 340px; }
+  }
   #panel h1 { font-size: 15px; font-weight: 650; margin-bottom: 2px; }
   #panel .sub { color: var(--ink-2); font-size: 12px; margin-bottom: 10px; }
   #panel h2 {
@@ -122,7 +138,11 @@
 <div id="map"></div>
 
 <div id="panel">
-  <h1>Overijssel — landgebruik</h1>
+  <div id="panel-head" role="button" tabindex="0" aria-expanded="true" aria-controls="panel-body">
+    <h1>Overijssel — landgebruik</h1>
+    <span id="panel-toggle" aria-hidden="true">▾</span>
+  </div>
+  <div id="panel-body">
   <div class="sub" id="subtitle">Veehouderij vs. menselijke voeding · Natura 2000 · stikstofzone</div>
 
   <h2>Gewaspercelen</h2>
@@ -179,6 +199,7 @@
     de definitieve juridische begrenzing kan afwijken.
     Bron: BRP Gewaspercelen &amp; Natura 2000 (RVO) via PDOK.
   </div>
+  </div><!-- /panel-body -->
 </div>
 
 <div id="loading"><div class="spin"></div><div>Percelen laden…</div></div>
@@ -193,6 +214,27 @@ const CAT_NL = { LI: "Veehouderij – intensief",
                  LE: "Veehouderij – extensief/natuurlijk",
                  H: "Menselijke voeding", M: "Gemengd / dual-use",
                  O: "Overig agrarisch" };
+
+// ---- collapsible panel (keeps the legend from covering a phone screen) ---
+(() => {
+  const panel = document.getElementById("panel");
+  const head = document.getElementById("panel-head");
+  const setCollapsed = c => {
+    panel.classList.toggle("collapsed", c);
+    head.setAttribute("aria-expanded", String(!c));
+    document.getElementById("panel-toggle").textContent = c ? "▸" : "▾";
+  };
+  head.addEventListener("click",
+    () => setCollapsed(!panel.classList.contains("collapsed")));
+  head.addEventListener("keydown", e => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      setCollapsed(!panel.classList.contains("collapsed"));
+    }
+  });
+  // start collapsed on small screens so the map is visible on load
+  if (window.matchMedia("(max-width: 600px)").matches) setCollapsed(true);
+})();
 
 document.getElementById("subtitle").textContent =
   `BRP ${META.year} · gebouwd ${META.built} · veehouderij vs. voeding · Natura 2000 + stikstofzone (500 m / 1 km)`;

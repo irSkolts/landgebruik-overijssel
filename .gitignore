@@ -2,3 +2,4 @@ data/raw/
 data/parcels.geojson
 node_modules/
 __pycache__/
+ToDoList.md

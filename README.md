@@ -76,10 +76,16 @@ CBS-landbouwtelling (StatLine 80780ned, zelfde jaar). Resultaat voor 2025:
 
 | categorie | kaart (ha) | CBS (ha) | verschil |
 |---|---:|---:|---:|
-| Veehouderij (gras/voer) | 171.194 | 173.441 | −1,3% |
+| Veehouderij (intensief + extensief) | 171.194 | 173.441 | −1,3% |
 | Menselijke voeding | 5.856 | 7.289 | −19,7% |
 | Gemengd / dual-use | 10.969 | 11.455 | −4,2% |
 | Totaal cultuurgrond | 196.951 | 195.525 | +0,7% |
+
+Veehouderij wordt gecombineerd vergeleken: CBS kent geen intensief/extensief-
+indeling. Als referentie voor de split: de kaart telt **27.279 ha** extensief,
+tegenover **7.589 ha** "natuurlijk grasland" bij CBS. Dat verschil is verwacht —
+kaart-extensief bevat naast BRP-"natuurlijk grasland" óók regulier grasland
+binnen NNN/Natura 2000, wat de bredere definitie is die we hebben gekozen.
 
 Het verschil bij "menselijke voeding" (±1.400 ha op een kleine categorie)
 past bij het bekende definitieverschil: CBS telt grond bij de provincie van
