@@ -93,8 +93,11 @@ RULES = [
            "kroten", "paksoi", "maanzaad", "bladgewassen"]),
 ]
 
-CAT_LABEL = {"L": "Veehouderij (gras/voer)", "H": "Menselijke voeding",
+CAT_LABEL = {"LI": "Veehouderij – intensief",
+             "LE": "Veehouderij – extensief/natuurlijk",
+             "H": "Menselijke voeding",
              "M": "Gemengd / dual-use", "O": "Overig agrarisch"}
+CATS = ["LI", "LE", "H", "M", "O"]  # display/stat order
 
 # Nitrogen-zone width (m) per Natura 2000 area, from the cabinet policy annex
 # "Verdiepingsbijlage Hoofdlijn 3: Inzet in en rond kwetsbare natuur- en
@@ -415,9 +418,29 @@ def main():
         log(f"Parcels in {w} m zone: {int((parcels['z'] == w).sum())}")
     log(f"Parcels outside any zone: {int((parcels['z'] == 0).sum())}")
 
+    # split livestock (L) into intensief (LI) vs extensief/natuurlijk (LE):
+    # extensief = grassland that is BRP "natuurlijk" OR lies inside a nature
+    # area (NNN or Natura 2000). Maize / other fodder stay intensief.
+    nnn_geom = get_nnn(prov_geom)
+    n2k_all = shapely.make_valid(shapely.union_all(near.geometry.values))
+    nat = shapely.union_all([nnn_geom, n2k_all])
+    in_nat = parcels.index.isin(parcels.iloc[sorted(
+        parcels.sindex.query(nat, predicate="intersects"))].index)
+    gewas_l = parcels["gewas"].str.lower()
+    is_grass = gewas_l.str.contains("grasland", na=False).values
+    is_natname = gewas_l.str.contains("natuurlijk", na=False).values
+    is_L = (parcels["cat"] == "L").values
+    ext = is_L & is_grass & (is_natname | in_nat)
+    parcels.loc[is_L, "cat"] = "LI"
+    parcels.loc[ext, "cat"] = "LE"
+    log(f"Livestock split: intensief {int((parcels['cat'] == 'LI').sum())}, "
+        f"extensief {int((parcels['cat'] == 'LE').sum())} "
+        f"(waarvan natuurlijk-naam {int((is_L & is_natname).sum())}, "
+        f"in NNN/N2000 {int((is_L & is_grass & in_nat).sum())})")
+
     # stats (ha per category: total, and in the nitrogen zone = any width > 0)
     stats = {}
-    for cat in "LHMO":
+    for cat in CATS:
         sub = parcels[parcels["cat"] == cat]
         in_zone = sub["z"] > 0
         stats[cat] = {"label": CAT_LABEL[cat],
@@ -461,7 +484,6 @@ def main():
                                 crs=RD).to_crs(WGS)
     zone_fc = to_fc(zone_gdf, {"w": "w"})
 
-    nnn_geom = get_nnn(prov_geom)
     nnn_gdf = gpd.GeoDataFrame({"id": [1]}, geometry=[
         shapely.simplify(nnn_geom, SIMPLIFY_AREA_M)], crs=RD).to_crs(WGS)
     nnn_fc = to_fc(nnn_gdf, {"id": "id"})
@@ -483,9 +505,9 @@ def main():
     write_js(DATA / "province.js", PROVINCE=prov_fc, META=meta)
 
     log("\nDone. Open index.html in your browser.")
-    for cat in "LHMO":
+    for cat in CATS:
         s = stats[cat]
-        log(f"  {s['label']:<26} {s['ha']:>8} ha total, "
+        log(f"  {s['label']:<30} {s['ha']:>8} ha total, "
             f"{s['ha_zone']:>7} ha in nitrogen zone")
 
 

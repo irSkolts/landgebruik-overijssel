@@ -16,7 +16,8 @@
     --muted: #898781;
     --hairline: #e1e0d9;
     --border: rgba(11,11,11,0.10);
-    --c-livestock: #eda100;
+    --c-livestock-int: #eda100;
+    --c-livestock-ext: #b5651d;
     --c-human: #2a78d6;
     --c-mixed: #e87ba4;
     --c-other: #898781;
@@ -76,14 +77,14 @@
   #stats table { width: 100%; border-collapse: collapse; font-size: 12px; }
   #stats th {
     text-align: right; font-weight: 500; color: var(--muted);
-    padding: 2px 0 4px; font-size: 11px;
+    padding: 2px 0 4px 8px; font-size: 11px; white-space: nowrap;
   }
-  #stats th:first-child { text-align: left; }
+  #stats th:first-child { text-align: left; padding-left: 0; }
   #stats td {
-    padding: 2px 0; text-align: right;
-    font-variant-numeric: tabular-nums;
+    padding: 2px 0 2px 8px; text-align: right;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
   }
-  #stats td:first-child { text-align: left; }
+  #stats td:first-child { text-align: left; padding-left: 0; white-space: normal; }
   #stats td.zone-col { color: var(--c-zone); font-weight: 600; }
 
   .note {
@@ -125,9 +126,12 @@
   <div class="sub" id="subtitle">Veehouderij vs. menselijke voeding · Natura 2000 · stikstofzone</div>
 
   <h2>Gewaspercelen</h2>
-  <label class="row"><input type="checkbox" id="ck-L" checked>
-    <span class="chip" style="background:var(--c-livestock)"></span>
-    <span class="lbl">Veehouderij (gras &amp; voer)</span><span class="ha" id="ha-L"></span></label>
+  <label class="row"><input type="checkbox" id="ck-LI" checked>
+    <span class="chip" style="background:var(--c-livestock-int)"></span>
+    <span class="lbl">Veehouderij &ndash; intensief</span><span class="ha" id="ha-LI"></span></label>
+  <label class="row"><input type="checkbox" id="ck-LE" checked>
+    <span class="chip" style="background:var(--c-livestock-ext)"></span>
+    <span class="lbl">Veehouderij &ndash; extensief/natuurlijk</span><span class="ha" id="ha-LE"></span></label>
   <label class="row"><input type="checkbox" id="ck-H" checked>
     <span class="chip" style="background:var(--c-human)"></span>
     <span class="lbl">Menselijke voeding</span><span class="ha" id="ha-H"></span></label>
@@ -163,7 +167,12 @@
   </div>
 
   <div class="note" id="note">
-    <b>Let op:</b> de zonebreedte volgt het kabinetsvoornemen
+    <b>Intensief vs. extensief:</b> extensief = grasland dat in de BRP als
+    &ldquo;natuurlijk&rdquo; staat óf binnen NNN/Natura 2000 ligt (indicatie van
+    natuurgericht beheer, geen beheerregistratie). Stalgebonden intensieve
+    veehouderij (varkens/pluimvee) zit niet in de BRP en dus niet op deze kaart.
+    <br><br>
+    <b>Stikstofzone:</b> de breedte volgt het kabinetsvoornemen
     (Verdiepingsbijlage Hoofdlijn 3, 2025): 500&nbsp;m rond de meeste
     stikstofgevoelige Natura 2000-gebieden, 1&nbsp;km rond enkele. Grote
     wateren krijgen geen zone. Dit is een voorlopige, geometrische benadering;
@@ -177,9 +186,13 @@
 <script src="data/province.js"></script>
 <script src="data/natura2000.js"></script>
 <script>
-const COLORS = { L: "#eda100", H: "#2a78d6", M: "#e87ba4", O: "#898781" };
-const CAT_NL = { L: "Veehouderij (gras & voer)", H: "Menselijke voeding",
-                 M: "Gemengd / dual-use", O: "Overig agrarisch" };
+const CATS = ["LI", "LE", "H", "M", "O"];
+const COLORS = { LI: "#eda100", LE: "#b5651d", H: "#2a78d6",
+                 M: "#e87ba4", O: "#898781" };
+const CAT_NL = { LI: "Veehouderij – intensief",
+                 LE: "Veehouderij – extensief/natuurlijk",
+                 H: "Menselijke voeding", M: "Gemengd / dual-use",
+                 O: "Overig agrarisch" };
 
 document.getElementById("subtitle").textContent =
   `BRP ${META.year} · gebouwd ${META.built} · veehouderij vs. voeding · Natura 2000 + stikstofzone (500 m / 1 km)`;
@@ -189,7 +202,7 @@ document.getElementById("n1000").textContent =
 // ---- stats panel ------------------------------------------------------
 const fmt = n => n.toLocaleString("nl-NL");
 const tbl = document.getElementById("stat-table");
-for (const c of ["L", "H", "M", "O"]) {
+for (const c of CATS) {
   const s = META.stats[c];
   document.getElementById("ha-" + c).textContent = fmt(s.ha) + " ha";
   const pct = s.ha ? Math.round(100 * s.ha_zone / s.ha) : 0;
@@ -256,7 +269,7 @@ map.on("load", () => {
   map.addSource("province", { type: "geojson", data: PROVINCE });
 
   // category fills — one layer per category so checkboxes map 1:1
-  for (const c of ["O", "M", "H", "L"]) {
+  for (const c of ["O", "M", "H", "LI", "LE"]) {
     map.addLayer({
       id: "parcels-" + c, type: "fill", source: "parcels",
       "source-layer": "parcels",
@@ -323,8 +336,7 @@ map.on("load", () => {
 
 // ---- toggles ----------------------------------------------------------
 function visibleCats() {
-  return ["L", "H", "M", "O"].filter(c =>
-    document.getElementById("ck-" + c).checked);
+  return CATS.filter(c => document.getElementById("ck-" + c).checked);
 }
 function zoneHatchFilter() {
   return ["all", [">", ["get", "z"], 0],
@@ -334,7 +346,7 @@ function wireToggles() {
   const vis = (id, on) =>
     map.setLayoutProperty(id, "visibility", on ? "visible" : "none");
   const refresh = () => {
-    for (const c of ["L", "H", "M", "O"])
+    for (const c of CATS)
       vis("parcels-" + c, document.getElementById("ck-" + c).checked);
     map.setFilter("parcels-zone-hatch", zoneHatchFilter());
     vis("parcels-zone-hatch", document.getElementById("ck-hatch").checked);
@@ -346,14 +358,14 @@ function wireToggles() {
     }
     vis("nnn-fill", document.getElementById("ck-nnn").checked);
   };
-  for (const id of ["ck-L", "ck-H", "ck-M", "ck-O", "ck-nnn", "ck-natura",
-                    "ck-zone500", "ck-zone1000", "ck-hatch"])
+  for (const id of ["ck-LI", "ck-LE", "ck-H", "ck-M", "ck-O", "ck-nnn",
+                    "ck-natura", "ck-zone500", "ck-zone1000", "ck-hatch"])
     document.getElementById(id).addEventListener("change", refresh);
   refresh();
 }
 
 // ---- popups -----------------------------------------------------------
-const parcelLayers = ["parcels-L", "parcels-H", "parcels-M", "parcels-O"];
+const parcelLayers = ["parcels-LI", "parcels-LE", "parcels-H", "parcels-M", "parcels-O"];
 map.on("click", e => {
   // parcels win over the Natura 2000 fill when both are under the cursor
   let fs = map.queryRenderedFeatures(e.point,

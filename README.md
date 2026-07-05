@@ -2,8 +2,13 @@
 
 Interactieve kaart van de provincie Overijssel met:
 
-- **Gewaspercelen** (BRP, RVO) ingedeeld in vier categorieën:
-  - **Veehouderij** — grasland, snijmaïs, voedergewassen (dieren houden/voeren)
+- **Gewaspercelen** (BRP, RVO) ingedeeld in categorieën:
+  - **Veehouderij – intensief** — productiegrasland (blijvend/tijdelijk),
+    snijmaïs en overige voedergewassen
+  - **Veehouderij – extensief/natuurlijk** — grasland dat in de BRP als
+    "natuurlijk" staat óf binnen NNN/Natura 2000 ligt (indicatie van
+    natuurgericht beheer; géén beheerregistratie). Stalgebonden intensieve
+    veehouderij (varkens/pluimvee) is landloos en zit niet in de BRP.
   - **Menselijke voeding** — aardappelen, groenten, fruit, peulvruchten
   - **Gemengd / dual-use** — granen, suikerbieten, zetmeelaardappelen, oliezaden
     (deels voedsel, deels veevoer/industrie)
