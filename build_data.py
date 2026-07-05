@@ -464,6 +464,11 @@ def main():
     log(f"  wrote {gj.name} ({gj.stat().st_size / 1e6:.1f} MB) "
         "-> run `node make_tiles.mjs` to build parcels.pmtiles")
 
+    # clip the displayed N2000 polygons to the province so border areas
+    # (Rijntakken, Drents-Friese Wold, …) don't sprawl far outside Overijssel.
+    # The full geometry was already used above for the zone buffers / overlays.
+    near["geometry"] = near.geometry.intersection(prov_geom)
+    near = near[~near.geometry.is_empty]
     near["geometry"] = near.geometry.simplify(SIMPLIFY_AREA_M)
     natura_w = near.to_crs(WGS)
     natura_fc = to_fc(natura_w, {"naam": "naamN2K", "bescherming": "beschermin"})

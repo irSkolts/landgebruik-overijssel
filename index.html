@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Overijssel — landgebruik, veehouderij &amp; Natura 2000</title>
+<link rel="icon" href="favicon.svg">
+<link rel="mask-icon" href="favicon.svg" color="#2f8f4e">
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css">
 <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
 <script src="https://unpkg.com/pmtiles@4.4.1/dist/pmtiles.js"></script>
@@ -271,7 +273,7 @@ const map = new maplibregl.Map({
     sources: {
       brt: {
         type: "raster",
-        tiles: ["https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/grijs/EPSG:3857/{z}/{x}/{y}.png"],
+        tiles: ["https://service.pdok.nl/brt/achtergrondkaart/wmts/v2_0/standaard/EPSG:3857/{z}/{x}/{y}.png"],
         tileSize: 256,
         attribution: "Kaart: &copy; <a href='https://www.kadaster.nl'>Kadaster</a> | Data: RVO via <a href='https://www.pdok.nl'>PDOK</a>"
       }
@@ -283,6 +285,10 @@ const map = new maplibregl.Map({
   maxZoom: 17
 });
 map.addControl(new maplibregl.NavigationControl(), "top-right");
+map.addControl(new maplibregl.GeolocateControl({
+  positionOptions: { enableHighAccuracy: true },
+  trackUserLocation: true, showUserLocation: true
+}), "top-right");
 map.addControl(new maplibregl.ScaleControl({ unit: "metric" }));
 
 // diagonal hatch tiles, drawn on a canvas (fill-pattern needs an image)
